@@ -3,38 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>أداة ضغط ملفات PDF السريعة</title>
-  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <title>أداة ضغط ملفات PDF المتقدمة</title>
   <style>
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-    body { background-color: #f8fafc; color: #1e293b; padding: 20px; margin: 0; }
-    .container { max-width: 650px; margin: 0 auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
-    h2 { margin-bottom: 20px; color: #0f172a; }
-    .drop-zone { border: 2px dashed #3b82f6; border-radius: 12px; padding: 30px; background: #eff6ff; cursor: pointer; transition: 0.2s; }
-    .drop-zone:hover { background: #dbeafe; }
-    input[type="file"] { display: none; }
-    .btn { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px; width: 100%; }
-    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
-    .file-list { margin-top: 20px; text-align: right; }
-    .file-item { background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-    .progress-bar { height: 6px; background: #2563eb; border-radius: 3px; width: 0%; transition: width 0.3s; margin-top: 5px; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+      color: #38bdf8;
+    }
+    .settings-group {
+      margin-bottom: 20px;
+      text-align: right;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+    select {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background-color: #0f172a;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus {
+      border-color: #38bdf8;
+    }
+    .drop-zone {
+      border: 2px dashed #475569;
+      padding: 30px 20px;
+      border-radius: 12px;
+      background: #0f172a;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 20px;
+    }
+    .drop-zone:hover {
+      border-color: #38bdf8;
+      background: #1e293b;
+    }
+    .drop-zone p {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 1rem;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    .upload-btn {
+      display: inline-block;
+      background: #0284c7;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-top: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .upload-btn:hover {
+      background: #0369a1;
+    }
+    .note {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h2>📄 ضغط ملفات PDF مجاناً</h2>
+    <h2>ضغط ملفات PDF</h2>
     
-    <div class="drop-zone" onclick="document.getElementById('pdfInput').click()">
-      <p>اضغط هنا لاختيار ملفات PDF أو اسحبها إلى هنا</p>
-      <input type="file" id="pdfInput" multiple accept="application/pdf">
+    <!-- قائمة اختيار جودة الضغط -->
+    <div class="settings-group">
+      <label for="qualitySelect">اختر مستوى جودة الضغط:</label>
+      <select id="qualitySelect">
+        <option value="low">ضغط منخفض (حجم أكبر، جودة عالية جداً)</option>
+        <option value="medium" selected>ضغط ممتاز (متوازن بين الحجم والجودة - موصى به)</option>
+        <option value="high">ضغط عالي (أصغر حجم ممكن)</option>
+      </select>
     </div>
 
-    <div id="fileList" class="file-list"></div>
+    <!-- منطقة سحب وإسقاط الملفات وزر الرفع -->
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click();">
+      <p>اسحب وأفح ملفات PDF هنا، أو اضغط للاختيار</p>
+      <span class="upload-btn">اختر الملفات (حتى 20 ملفاً)</span>
+      <input type="file" id="fileInput" multiple accept="application/pdf">
+    </div>
 
-    <button id="compressBtn" class="btn" style="display: none;">بدء الضغط الآن</button>
+    <div class="note">
+      يتم معالجة الملفات الصغيرة والكبيرة جداً محلياً في متصفحك لضمان السرعة والخصوصية، بينما تعالج الملفات الأخرى عبر السيرفر.
+    </div>
   </div>
 
+  <!-- ربط ملف الـ JavaScript البرمجي -->
   <script src="app.js"></script>
 </body>
 </html>
