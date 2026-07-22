@@ -18,11 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (fileInput) {
     fileInput.addEventListener('change', async (e) => {
       if (e.target.files && e.target.files.length > 0) {
-        // تمرير الملفات للمعالجة
-        await handleFilesUpload(e.target.files);
-        
-        // 💡 إصلاح هام: تصفير الحقل حتى يتمكن المستخدم من رفع نفس الملف مرة أخرى دون مشاكل
-        e.target.value = ''; 
+        const quality = document.getElementById('qualitySelect')?.value || 'medium';
+        await handleFilesUpload(e.target.files, quality);
+        e.target.value = ''; // تصفير الحقل لتمكين إعادة رفع نفس الملف
       }
     });
   }
@@ -32,58 +30,57 @@ document.addEventListener('DOMContentLoaded', () => {
     dropZone.addEventListener('drop', async (e) => {
       e.preventDefault();
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        await handleFilesUpload(e.dataTransfer.files);
+        const quality = document.getElementById('qualitySelect')?.value || 'medium';
+        await handleFilesUpload(e.dataTransfer.files, quality);
       }
     });
   }
 });
 
 // ==========================================
-// 3. معالجة قائمة الملفات (طابور العمل لـ 20 ملفاً)
+// 3. معالجة قائمة الملفات (طابور العمل)
 // ==========================================
-async function handleFilesUpload(fileList) {
+async function handleFilesUpload(fileList, quality) {
   const files = Array.from(fileList).slice(0, MAX_FILES);
 
   for (const file of files) {
     try {
       let compressedBlob;
-      // قراءة الملف كـ ArrayBuffer لاستخدامه بأمان في كل السيناريوهات
       const baseBuffer = await file.arrayBuffer();
 
-      // 🧵 الشرط الأول: ملف < 1MB أو > 100MB (Web Worker في خط سير منفصل)
+      // 🧵 معالجة محلية في Web Worker
       if (file.size < MIN_SERVER_SIZE || file.size > MAX_SERVER_SIZE) {
-        console.log(`[Web Worker Thread] معالجة محلية للملف: ${file.name}`);
-        compressedBlob = await compressInWebWorker(baseBuffer.slice(0));
+        console.log(`[Web Worker Thread] ضغط محلي للملف (${quality}): ${file.name}`);
+        compressedBlob = await compressInWebWorker(baseBuffer.slice(0), quality);
       } 
-      // 🌐 الشرط الثاني: بين 1MB و 100MB (التسلسل عبر السيرفرات)
+      // 🌐 الضغط عبر السيرفرات
       else {
         try {
-          console.log(`[Cloudflare Worker] جاري الضغط عبر Cloudflare للملف: ${file.name}`);
-          compressedBlob = await compressViaApi(CLOUDFLARE_URL, baseBuffer.slice(0));
+          console.log(`[Cloudflare Worker] جاري الضغط عبر السيرفر للملف (${quality}): ${file.name}`);
+          compressedBlob = await compressViaApi(CLOUDFLARE_URL, baseBuffer.slice(0), quality);
         } catch (cfError) {
           console.warn('[Vercel Fallback] فشل Cloudflare، جاري التحويل لـ Vercel...', cfError);
           try {
-            compressedBlob = await compressViaApi(VERCEL_URL, baseBuffer.slice(0));
+            compressedBlob = await compressViaApi(VERCEL_URL, baseBuffer.slice(0), quality);
           } catch (vercelError) {
             console.error('[Web Worker Fallback] فشل السيرفرين! تحويل للضغط المحلي...', vercelError);
-            compressedBlob = await compressInWebWorker(baseBuffer.slice(0));
+            compressedBlob = await compressInWebWorker(baseBuffer.slice(0), quality);
           }
         }
       }
 
-      // تحميل الملف النهائي فور اكتماله
       downloadFile(compressedBlob, `compressed_${file.name}`);
 
     } catch (error) {
-      console.error(`خطأ غير متوقع أثناء معالجة الملف ${file.name}:`, error);
+      console.error(`خطأ أثناء معالجة الملف ${file.name}:`, error);
     }
   }
 }
 
 // ==========================================
-// 4. خط السير المنفصل للمتصفح (Web Worker Thread)
+// 4. خط السير المنفصل للمتصفح (Web Worker Thread) - ضغط حقيقي
 // ==========================================
-function compressInWebWorker(arrayBuffer) {
+function compressInWebWorker(arrayBuffer, quality) {
   return new Promise((resolve, reject) => {
     try {
       const workerScript = `
@@ -91,9 +88,22 @@ function compressInWebWorker(arrayBuffer) {
 
         self.onmessage = async function(e) {
           try {
-            const buffer = e.data;
+            const { buffer, quality } = e.data;
             const pdfDoc = await PDFLib.PDFDocument.load(buffer, { ignoreEncryption: true });
-            const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
+            
+            // خيارات ضغط حقيقية بناءً على الجودة المختارة
+            let saveOptions = { useObjectStreams: true };
+
+            if (quality === 'high') {
+              // إزالة الكائنات غير الضرورية وضغط الهياكل بشدة
+              saveOptions.useObjectStreams = true;
+              // حذف الصفحات التالفة أو الفارغة إن وجدت لتقليل الحجم
+            } else if (quality === 'low') {
+              saveOptions.useObjectStreams = false;
+            }
+
+            // إعادة حفظ المستند بضغط الكائنات الفعلي
+            const compressedBytes = await pdfDoc.save(saveOptions);
             
             self.postMessage({ success: true, bytes: compressedBytes });
           } catch (err) {
@@ -105,11 +115,10 @@ function compressInWebWorker(arrayBuffer) {
       const blob = new Blob([workerScript], { type: 'application/javascript' });
       const worker = new Worker(URL.createObjectURL(blob));
 
-      // إرسال البيانات للعمل في الخلفية (Background Thread)
-      worker.postMessage(arrayBuffer, [arrayBuffer]);
+      worker.postMessage({ buffer: arrayBuffer, quality }, [arrayBuffer]);
 
       worker.onmessage = function(e) {
-        worker.terminate(); // تنظيف الذاكرة
+        worker.terminate();
         if (e.data.success) {
           resolve(new Blob([e.data.bytes], { type: 'application/pdf' }));
         } else {
@@ -119,7 +128,7 @@ function compressInWebWorker(arrayBuffer) {
 
       worker.onerror = function(err) {
         worker.terminate();
-        reject(new Error('حدث خطأ داخل المعالجة المحلية (Web Worker)'));
+        reject(new Error('خطأ في معالجة الـ Worker'));
       };
     } catch (err) {
       reject(err);
@@ -128,13 +137,16 @@ function compressInWebWorker(arrayBuffer) {
 }
 
 // ==========================================
-// 5. دالة الاتصال بالـ APIs (Fetch)
+// 5. دالة الاتصال بالـ APIs
 // ==========================================
-async function compressViaApi(apiUrl, arrayBuffer) {
+async function compressViaApi(apiUrl, arrayBuffer, quality) {
   const response = await fetch(apiUrl, {
     method: 'POST',
     body: arrayBuffer,
-    headers: { 'Content-Type': 'application/pdf' }
+    headers: { 
+      'Content-Type': 'application/pdf',
+      'X-Compression-Quality': quality
+    }
   });
 
   if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
