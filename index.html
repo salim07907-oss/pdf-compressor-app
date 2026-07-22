@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أداة ضغط ملفات PDF السريعة</title>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #f8fafc; color: #1e293b; padding: 20px; margin: 0; }
+    .container { max-width: 650px; margin: 0 auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
+    h2 { margin-bottom: 20px; color: #0f172a; }
+    .drop-zone { border: 2px dashed #3b82f6; border-radius: 12px; padding: 30px; background: #eff6ff; cursor: pointer; transition: 0.2s; }
+    .drop-zone:hover { background: #dbeafe; }
+    input[type="file"] { display: none; }
+    .btn { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px; width: 100%; }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    .file-list { margin-top: 20px; text-align: right; }
+    .file-item { background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .progress-bar { height: 6px; background: #2563eb; border-radius: 3px; width: 0%; transition: width 0.3s; margin-top: 5px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>📄 ضغط ملفات PDF مجاناً</h2>
+    
+    <div class="drop-zone" onclick="document.getElementById('pdfInput').click()">
+      <p>اضغط هنا لاختيار ملفات PDF أو اسحبها إلى هنا</p>
+      <input type="file" id="pdfInput" multiple accept="application/pdf">
+    </div>
+
+    <div id="fileList" class="file-list"></div>
+
+    <button id="compressBtn" class="btn" style="display: none;">بدء الضغط الآن</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
